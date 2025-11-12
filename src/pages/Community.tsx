@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Heart, MessageCircle, Send, Plus, Star, TrendingUp, Search, Filter, Edit2, Trash2, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import TextToSpeech from "@/components/TextToSpeech";
 
 const CATEGORIES = ["Dúvida", "Conquista", "Curiosidade", "Experiência", "Dica", "Outro"];
 
@@ -34,7 +35,7 @@ const Community = () => {
   const [selectedCategory, setSelectedCategory] = useState("Todos");
   const [sortBy, setSortBy] = useState<"recent" | "popular">("recent");
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
-  const [newComment, setNewComment] = useState("");
+  const [newComment, setNewComment] = useState<Record<string, string>>({});
   const [editingPost, setEditingPost] = useState<string | null>(null);
 
   const [posts, setPosts] = useState<Post[]>([]);
@@ -192,7 +193,8 @@ const Community = () => {
       return;
     }
 
-    if (!newComment.trim()) return;
+    const commentText = newComment[postId] || "";
+    if (!commentText.trim()) return;
 
     try {
       const comment: Omit<Comment, 'id'> = {
@@ -200,14 +202,14 @@ const Community = () => {
         author: user.name,
         authorId: user.id,
         avatar: user.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.id}`,
-        content: newComment,
+        content: commentText,
         timestamp: "Agora",
         createdAt: Date.now(),
       };
 
       await createComment(comment);
       await loadComments(postId);
-      setNewComment("");
+      setNewComment(prev => ({ ...prev, [postId]: "" }));
       
       toast({
         title: "Comentário adicionado! 💬",
@@ -272,10 +274,10 @@ const Community = () => {
         </div>
 
         {/* Filtros e Busca */}
-        <div className="mb-6 space-y-4">
-          <div className="flex flex-col md:flex-row gap-3">
+        <Card className="mb-6 p-4">
+          <div className="flex flex-col gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               <Input
                 placeholder="Buscar posts..."
                 value={searchQuery}
@@ -283,30 +285,32 @@ const Community = () => {
                 className="pl-10"
               />
             </div>
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-full md:w-[200px]">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Todos">Todas Categorias</SelectItem>
-                {CATEGORIES.map(cat => (
-                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
-              <SelectTrigger className="w-full md:w-[200px]">
-                <TrendingUp className="w-4 h-4 mr-2" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="recent">Mais Recentes</SelectItem>
-                <SelectItem value="popular">Mais Populares</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col md:flex-row gap-3">
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-full md:min-w-[200px]">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Todos">Todas Categorias</SelectItem>
+                  {CATEGORIES.map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
+                <SelectTrigger className="w-full md:min-w-[200px]">
+                  <TrendingUp className="w-4 h-4 mr-2" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="recent">Mais Recentes</SelectItem>
+                  <SelectItem value="popular">Mais Populares</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-        </div>
+        </Card>
 
         {/* New Post Button */}
         <div className="mb-6">
@@ -436,25 +440,28 @@ const Community = () => {
                 <CardContent className="space-y-4">
                   <p className="text-foreground whitespace-pre-wrap">{post.content}</p>
                   
-                  <div className="flex items-center gap-4 pt-2 border-t">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className={`gap-2 ${hasLiked ? 'text-primary' : ''}`}
-                      onClick={() => handleLike(post.id)}
-                    >
-                      <Heart className={`w-4 h-4 ${hasLiked ? 'fill-current' : ''}`} />
-                      {post.likes}
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="gap-2"
-                      onClick={() => setExpandedPost(isExpanded ? null : post.id)}
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                      {postComments.length}
-                    </Button>
+                  <div className="flex items-center justify-between gap-4 pt-2 border-t flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className={`gap-2 ${hasLiked ? 'text-primary' : ''}`}
+                        onClick={() => handleLike(post.id)}
+                      >
+                        <Heart className={`w-4 h-4 ${hasLiked ? 'fill-current' : ''}`} />
+                        {post.likes}
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="gap-2"
+                        onClick={() => setExpandedPost(isExpanded ? null : post.id)}
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        {postComments.length}
+                      </Button>
+                    </div>
+                    <TextToSpeech text={`${post.title}. ${post.content}`} />
                   </div>
 
                   {/* Seção de Comentários */}
@@ -490,14 +497,14 @@ const Community = () => {
                         <div className="flex gap-2">
                           <Input
                             placeholder="Escreva um comentário..."
-                            value={newComment}
-                            onChange={(e) => setNewComment(e.target.value)}
+                            value={newComment[post.id] || ""}
+                            onChange={(e) => setNewComment(prev => ({ ...prev, [post.id]: e.target.value }))}
                             onKeyPress={(e) => e.key === 'Enter' && handleAddComment(post.id)}
                           />
                           <Button 
                             size="sm"
                             onClick={() => handleAddComment(post.id)}
-                            disabled={!newComment.trim()}
+                            disabled={!(newComment[post.id] || "").trim()}
                           >
                             <Send className="w-4 h-4" />
                           </Button>

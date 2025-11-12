@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Play, Pause, RotateCcw, Trophy } from "lucide-react";
+import { ArrowLeft, Play, Pause, RotateCcw, Trophy, ArrowUp, ArrowDown, ArrowRight, ArrowLeftIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -116,6 +116,11 @@ const SnakeGame = () => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (!isPlaying || gameOver) return;
 
+      // Prevenir scroll da página com as setas
+      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+        e.preventDefault();
+      }
+
       switch (e.key) {
         case "ArrowUp":
           if (directionRef.current !== "DOWN") {
@@ -148,6 +153,22 @@ const SnakeGame = () => {
     return () => window.removeEventListener("keydown", handleKeyPress);
   }, [isPlaying, gameOver]);
 
+  const handleMobileControl = (newDirection: Direction) => {
+    if (!isPlaying || gameOver) return;
+    
+    const opposites: Record<Direction, Direction> = {
+      UP: "DOWN",
+      DOWN: "UP",
+      LEFT: "RIGHT",
+      RIGHT: "LEFT",
+    };
+
+    if (directionRef.current !== opposites[newDirection]) {
+      directionRef.current = newDirection;
+      setDirection(newDirection);
+    }
+  };
+
   return (
     <div className="min-h-screen py-8">
       <div className="container-custom max-w-4xl">
@@ -166,7 +187,7 @@ const SnakeGame = () => {
               <div>
                 <CardTitle className="text-3xl mb-2">🐍 Jogo da Cobra</CardTitle>
                 <CardDescription className="text-base">
-                  Use as setas do teclado para controlar a cobra
+                  Use as setas do teclado ou os botões abaixo para controlar
                 </CardDescription>
               </div>
               <Badge variant="outline" className="text-lg px-4 py-2">
@@ -180,35 +201,48 @@ const SnakeGame = () => {
             {/* Game Board */}
             <div className="flex justify-center">
               <div
-                className="border-4 border-primary rounded-lg bg-card-soft"
+                className="border-2 border-border bg-background shadow-lg"
                 style={{
                   width: GRID_SIZE * CELL_SIZE,
                   height: GRID_SIZE * CELL_SIZE,
                   position: "relative",
+                  display: "grid",
+                  gridTemplateColumns: `repeat(${GRID_SIZE}, ${CELL_SIZE}px)`,
+                  gridTemplateRows: `repeat(${GRID_SIZE}, ${CELL_SIZE}px)`,
                 }}
               >
+                {/* Grid lines */}
+                {Array.from({ length: GRID_SIZE * GRID_SIZE }).map((_, i) => (
+                  <div
+                    key={`grid-${i}`}
+                    className="border border-border/10"
+                    style={{ width: CELL_SIZE, height: CELL_SIZE }}
+                  />
+                ))}
                 {/* Snake */}
                 {snake.map((segment, index) => (
                   <div
                     key={index}
-                    className="absolute bg-primary rounded transition-all"
+                    className="absolute bg-primary"
                     style={{
-                      width: CELL_SIZE - 2,
-                      height: CELL_SIZE - 2,
+                      width: CELL_SIZE,
+                      height: CELL_SIZE,
                       left: segment.x * CELL_SIZE,
                       top: segment.y * CELL_SIZE,
-                      opacity: index === 0 ? 1 : 0.8,
+                      opacity: index === 0 ? 1 : 0.9,
+                      boxShadow: index === 0 ? "0 0 10px rgba(var(--primary), 0.5)" : "none",
                     }}
                   />
                 ))}
                 {/* Food */}
                 <div
-                  className="absolute bg-accent rounded-full animate-pulse"
+                  className="absolute bg-accent animate-pulse"
                   style={{
-                    width: CELL_SIZE - 2,
-                    height: CELL_SIZE - 2,
+                    width: CELL_SIZE,
+                    height: CELL_SIZE,
                     left: food.x * CELL_SIZE,
                     top: food.y * CELL_SIZE,
+                    boxShadow: "0 0 15px rgba(var(--accent), 0.6)",
                   }}
                 />
                 {/* Game Over Overlay */}
@@ -249,7 +283,7 @@ const SnakeGame = () => {
             </div>
 
             {/* Controls */}
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-3 justify-center flex-wrap">
               {!isPlaying && !gameOver && (
                 <Button
                   size="lg"
@@ -282,13 +316,64 @@ const SnakeGame = () => {
               </Button>
             </div>
 
+            {/* Mobile Controls */}
+            <div className="lg:hidden">
+              <p className="text-center text-sm text-muted-foreground mb-4">
+                Controles do Jogo
+              </p>
+              <div className="grid grid-cols-3 gap-2 max-w-xs mx-auto">
+                <div></div>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => handleMobileControl("UP")}
+                  className="w-full aspect-square"
+                  disabled={!isPlaying || gameOver}
+                  aria-label="Mover para cima"
+                >
+                  <ArrowUp className="w-6 h-6" />
+                </Button>
+                <div></div>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => handleMobileControl("LEFT")}
+                  className="w-full aspect-square"
+                  disabled={!isPlaying || gameOver}
+                  aria-label="Mover para esquerda"
+                >
+                  <ArrowLeftIcon className="w-6 h-6" />
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => handleMobileControl("DOWN")}
+                  className="w-full aspect-square"
+                  disabled={!isPlaying || gameOver}
+                  aria-label="Mover para baixo"
+                >
+                  <ArrowDown className="w-6 h-6" />
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => handleMobileControl("RIGHT")}
+                  className="w-full aspect-square"
+                  disabled={!isPlaying || gameOver}
+                  aria-label="Mover para direita"
+                >
+                  <ArrowRight className="w-6 h-6" />
+                </Button>
+              </div>
+            </div>
+
             {/* Instructions */}
             <Card className="bg-card-soft border-2">
               <CardHeader>
                 <CardTitle className="text-lg">Como Jogar</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
-                <p>• Use as setas do teclado (↑ ↓ ← →) para mover a cobra</p>
+                <p>• Use as setas do teclado ou os botões para mover a cobra</p>
                 <p>• Coma a comida (círculo brilhante) para crescer</p>
                 <p>• Não bata nas paredes ou no próprio corpo</p>
                 <p>• Cada comida vale 10 pontos e 5 XP no final</p>

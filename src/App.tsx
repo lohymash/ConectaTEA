@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,19 +7,23 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import Community from "./pages/Community";
-import Games from "./pages/Games";
-import SnakeGame from "./pages/games/SnakeGame";
-import EmotionsGame from "./pages/games/EmotionsGame";
-import SimonGame from "./pages/games/SimonGame";
-import MemoryGame from "./pages/games/MemoryGame";
-import Articles from "./pages/Articles";
-import Profile from "./pages/Profile";
-import NotFound from "./pages/NotFound";
-import About from "./pages/About";
+import LoadingScreen from "@/components/LoadingScreen";
+import GlobalTTS from "@/components/GlobalTTS";
+
+// Lazy load pages
+const Index = lazy(() => import("./pages/Index"));
+const Auth = lazy(() => import("./pages/Auth"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Community = lazy(() => import("./pages/Community"));
+const Games = lazy(() => import("./pages/Games"));
+const SnakeGame = lazy(() => import("./pages/games/SnakeGame"));
+const EmotionsGame = lazy(() => import("./pages/games/EmotionsGame"));
+const SimonGame = lazy(() => import("./pages/games/SimonGame"));
+const MemoryGame = lazy(() => import("./pages/games/MemoryGame"));
+const Articles = lazy(() => import("./pages/Articles"));
+const Profile = lazy(() => import("./pages/Profile"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const About = lazy(() => import("./pages/About"));
 
 const queryClient = new QueryClient();
 
@@ -28,7 +33,9 @@ const AppContent = () => {
   return (
     <>
       <Header isDark={theme === "dark"} toggleTheme={toggleTheme} />
-      <Routes>
+      <GlobalTTS />
+      <Suspense fallback={<LoadingScreen />}>
+        <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/dashboard" element={<Dashboard />} />
@@ -43,7 +50,8 @@ const AppContent = () => {
         <Route path="/profile" element={<Profile />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
-      </Routes>
+        </Routes>
+      </Suspense>
     </>
   );
 };

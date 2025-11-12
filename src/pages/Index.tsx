@@ -1,12 +1,36 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Users, Gamepad2, BookOpen, Star, Heart, Sparkles } from "lucide-react";
 import heroBackground from "@/assets/hero-background.jpg";
 import featuresIllustration from "@/assets/features-illustration.png";
+import NewsArticles from "@/components/NewsArticles";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 const Index = () => {
+  const [membersCount, setMembersCount] = useState<number | null>(null);
+  const [loadingMembers, setLoadingMembers] = useState(true);
+
+  useEffect(() => {
+    const fetchMembersCount = async () => {
+      try {
+        const usersSnapshot = await getDocs(collection(db, 'users'));
+        setMembersCount(usersSnapshot.size);
+      } catch (error) {
+        console.error("Erro ao buscar membros:", error);
+        setMembersCount(0);
+      } finally {
+        setLoadingMembers(false);
+      }
+    };
+
+    fetchMembersCount();
+  }, []);
+
   const features = [
     {
       icon: Users,
@@ -35,7 +59,10 @@ const Index = () => {
   ];
 
   const stats = [
-    { value: "1000+", label: "Membros Ativos" },
+    { 
+      value: loadingMembers ? <Skeleton className="h-8 w-20 mx-auto" /> : membersCount?.toString() || "0", 
+      label: "Membros Ativos" 
+    },
     { value: "4", label: "Jogos Disponíveis" },
     { value: "50+", label: "Artigos" },
     { value: "100%", label: "Acessível" },
@@ -143,6 +170,9 @@ const Index = () => {
           </div>
         </div>
       </section>
+
+      {/* News Section */}
+      <NewsArticles />
 
       {/* CTA Section */}
       <section className="py-20 bg-gradient-hero">

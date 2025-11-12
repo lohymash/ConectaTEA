@@ -3,7 +3,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { BookOpen, ExternalLink, Search, Clock, TrendingUp } from "lucide-react";
+import { BookOpen, ExternalLink, Search, Clock, TrendingUp, Languages, BookOpenCheck } from "lucide-react";
+import TextToSpeech from "@/components/TextToSpeech";
+import ArticleReader from "@/components/ArticleReader";
+import { fetchAutismNews, translateText, NewsArticle as ApiArticle } from "@/services/newsApi";
+import { useToast } from "@/hooks/use-toast";
 
 interface Article {
   id: string;
@@ -13,73 +17,114 @@ interface Article {
   source: string;
   publishedAt: string;
   category: string;
+  content?: string;
 }
 
 const Articles = () => {
   const [articles, setArticles] = useState<Article[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [translating, setTranslating] = useState<Record<string, boolean>>({});
+  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
+  const [isReaderOpen, setIsReaderOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const { toast } = useToast();
 
-  // Simulação de artigos - substituir por API real
   useEffect(() => {
-    const mockArticles: Article[] = [
-      {
-        id: "1",
-        title: "Avanços no diagnóstico precoce do TEA",
-        description: "Novas tecnologias e métodos estão tornando possível identificar sinais de autismo em crianças cada vez mais cedo, permitindo intervenções mais eficazes.",
-        url: "#",
-        source: "Portal Autismo Brasil",
-        publishedAt: "2024-01-15",
-        category: "Diagnóstico",
-      },
-      {
-        id: "2",
-        title: "Terapias baseadas em jogos para autistas",
-        description: "Estudos mostram que jogos terapêuticos podem auxiliar significativamente no desenvolvimento de habilidades sociais e cognitivas.",
-        url: "#",
-        source: "Revista Neurociência",
-        publishedAt: "2024-01-10",
-        category: "Terapias",
-      },
-      {
-        id: "3",
-        title: "Inclusão no mercado de trabalho",
-        description: "Empresas brasileiras estão implementando programas específicos para contratar e apoiar profissionais autistas.",
-        url: "#",
-        source: "TEA Notícias",
-        publishedAt: "2024-01-05",
-        category: "Inclusão",
-      },
-      {
-        id: "4",
-        title: "Estratégias para lidar com sobrecarga sensorial",
-        description: "Especialistas compartilham técnicas práticas para gerenciar situações de sobrecarga sensorial no dia a dia.",
-        url: "#",
-        source: "Autismo em Foco",
-        publishedAt: "2023-12-28",
-        category: "Qualidade de Vida",
-      },
-      {
-        id: "5",
-        title: "Direitos das pessoas autistas no Brasil",
-        description: "Conheça as principais leis e direitos garantidos para pessoas com TEA no território nacional.",
-        url: "#",
-        source: "Direito e Autismo",
-        publishedAt: "2023-12-20",
-        category: "Direitos",
-      },
-    ];
-
-    setTimeout(() => {
-      setArticles(mockArticles);
-      setIsLoading(false);
-    }, 1000);
+    loadArticles();
   }, []);
 
-  const filteredArticles = articles.filter(article =>
-    article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    article.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const loadArticles = async (page: number = 1) => {
+    const isFirstLoad = page === 1;
+    if (isFirstLoad) {
+      setIsLoading(true);
+    } else {
+      setIsLoadingMore(true);
+    }
+    
+    try {
+      const newsArticles = await fetchAutismNews(page);
+      const formattedArticles: Article[] = newsArticles.map((article, index) => ({
+        id: `article-${page}-${index}`,
+        title: article.title,
+        description: article.description,
+        url: article.url,
+        source: article.source,
+        publishedAt: article.publishedAt,
+        category: article.category,
+        content: article.content,
+      }));
+      
+      if (isFirstLoad) {
+        setArticles(formattedArticles);
+      } else {
+        setArticles(prev => [...prev, ...formattedArticles]);
+      }
+    } catch (error) {
+      console.error("Error loading articles:", error);
+      toast({
+        title: "Erro ao carregar artigos",
+        description: "Não foi possível carregar os artigos. Tente novamente mais tarde.",
+        variant: "destructive",
+      });
+    } finally {
+      if (isFirstLoad) {
+        setIsLoading(false);
+      } else {
+        setIsLoadingMore(false);
+      }
+    }
+  };
+
+  const handleLoadMore = async () => {
+    const nextPage = currentPage + 1;
+    setCurrentPage(nextPage);
+    await loadArticles(nextPage);
+  };
+
+  const handleTranslate = async (articleId: string) => {
+    setTranslating((prev) => ({ ...prev, [articleId]: true }));
+    
+    const article = articles.find((a) => a.id === articleId);
+    if (!article) return;
+
+    try {
+      const translatedTitle = await translateText(article.title);
+      const translatedDescription = await translateText(article.description);
+
+      setArticles((prev) =>
+        prev.map((a) =>
+          a.id === articleId
+            ? { ...a, title: translatedTitle, description: translatedDescription }
+            : a
+        )
+      );
+
+      toast({
+        title: "Tradução concluída",
+        description: "O artigo foi traduzido para português",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro na tradução",
+        description: "Não foi possível traduzir o artigo",
+        variant: "destructive",
+      });
+    } finally {
+      setTranslating((prev) => ({ ...prev, [articleId]: false }));
+    }
+  };
+
+  const categories = ["Todos", "Diagnóstico", "Terapias", "Inclusão", "Qualidade de Vida", "Direitos"];
+  const [selectedCategory, setSelectedCategory] = useState("Todos");
+
+  const filteredArticles = articles.filter(article => {
+    const matchesSearch = article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      article.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === "Todos" || article.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -90,8 +135,14 @@ const Articles = () => {
     });
   };
 
-  const categories = ["Todos", "Diagnóstico", "Terapias", "Inclusão", "Qualidade de Vida", "Direitos"];
-  const [selectedCategory, setSelectedCategory] = useState("Todos");
+  const handleReadArticle = (article: Article) => {
+    setSelectedArticle(article);
+    setIsReaderOpen(true);
+  };
+
+  const getArticleContent = (article: Article) => {
+    return article.content || article.description;
+  };
 
   return (
     <div className="min-h-screen py-8">
@@ -166,12 +217,39 @@ const Articles = () => {
                   </CardHeader>
                   
                   <CardContent>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
                       <span className="text-sm text-muted-foreground">{article.source}</span>
-                      <Button variant="outline" size="sm" className="gap-2">
-                        <ExternalLink className="w-4 h-4" />
-                        Ler mais
-                      </Button>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleTranslate(article.id)}
+                          disabled={translating[article.id]}
+                          className="gap-2"
+                          title="Traduzir para português"
+                        >
+                          <Languages className="w-4 h-4" />
+                          {translating[article.id] ? "Traduzindo..." : "PT-BR"}
+                        </Button>
+                        <Button 
+                          variant="default" 
+                          size="sm" 
+                          className="gap-2"
+                          onClick={() => handleReadArticle(article)}
+                        >
+                          <BookOpenCheck className="w-4 h-4" />
+                          Ler Aqui
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="gap-2"
+                          onClick={() => window.open(article.url, "_blank")}
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          Ver Original
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -193,13 +271,34 @@ const Articles = () => {
             {/* Load More */}
             {filteredArticles.length > 0 && (
               <div className="text-center">
-                <Button variant="outline" size="lg" className="gap-2">
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  className="gap-2"
+                  onClick={handleLoadMore}
+                  disabled={isLoadingMore}
+                >
                   <TrendingUp className="w-5 h-5" />
-                  Carregar Mais Artigos
+                  {isLoadingMore ? "Carregando..." : "Carregar Mais Artigos"}
                 </Button>
               </div>
             )}
           </>
+        )}
+
+        {/* Article Reader Dialog */}
+        {selectedArticle && (
+          <ArticleReader
+            isOpen={isReaderOpen}
+            onClose={() => {
+              setIsReaderOpen(false);
+              setSelectedArticle(null);
+            }}
+            title={selectedArticle.title}
+            content={getArticleContent(selectedArticle)}
+            url={selectedArticle.url}
+            source={selectedArticle.source}
+          />
         )}
 
         {/* Info Card */}
